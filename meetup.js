@@ -6,68 +6,98 @@ var db = pmongo('mongodb://localhost:27017/feedme', ["meetup"]); // feedmeserver
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var meetupApiKey = process.env.MEETUPAPIKEY || "123FAKEKEY";
-var radius = "30"; //in miles
+var radius = "50"; //in miles
 var targetAddress = "San Francisco";
 request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}})
-  .then(function(response){
-    var body = JSON.parse(response[0].body);
-    if(body.status === "OK"){
-      var lat = body.results[0].geometry.location.lat;
-      var lon = body.results[0].geometry.location.lng;
-      return {lat: lat, lon:lon};
-    }else {
-      console.log("API Error:", body.status);
-      process.exit(1);
-      return null;
-    }})
-  .then(function(data){
-    if(!data){
-      return;
-    }
-    console.log("Lat:", data.lat, "Long:", data.lon, "Status: OK");
-    request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:data.lat, lon:data.lon, radius:radius, limited_events:"false", text_format:"plain", time:(new Date().getTime()-24*60*60*1000)+","}})
+.then(function(response){
+  var body = JSON.parse(response[0].body);
+  if(body.status === "OK"){
+    var lat = body.results[0].geometry.location.lat;
+    var lon = body.results[0].geometry.location.lng;
+    return {lat: lat, lon:lon};
+  }else {
+    console.log("API Error:", body.status);
+    process.exit(1);
+    return null;
+  }})
+.then(function(data){
+  if(!data){
+    return;
+  }
+  console.log("Lat:", data.lat, "Long:", data.lon, "Status: OK");
+  var currentDate = new Date().getTime()-24*60*60*1000; //currentTime minus 1 day;
+  getResults(data.lat, data.lon, radius, currentDate);
+});
+//recursive function that pulls down data from meetup, then changes the start date and recurses again
+var getResults = function(lat, lon, radius, startDate, recursiveCount){
+  if(recursiveCount === undefined){
+     recursiveCount = 99999;
+  }
+  var maxDate = new Date();
+  maxDate.setFullYear(maxDate.getFullYear()+1);
+  if(startDate > maxDate.getTime()){
+    console.log("Max Date Reached:", maxDate);
+    return; //ends recursive loop
+  }
+  console.log("Trying to get results from meetup:", new Date(startDate));
+  request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:lat, lon:lon, radius:radius, limited_events:"false", text_format:"plain", time:(startDate+",")}})
     .then(function(response){
       var body = JSON.parse(response[0].body);
       var results = body.results;
-      console.log("Results length:", results);
+      console.log("Results length:", results.length);
       if(results){
-        _.map(results, function(item){
+        //formats results into normalized database entry 
+        results = _.map(results, function(item){
+          item.venue = item.venue || {};
+          item.fee = item.fee || {};
           return {
-            description:'You Too Can Make Videos That Rock!',
-            duration: 10800000,
-            fee: 99,
-            keywords:'beer, pizza',
-            latitude: 37.962147,
-            longitude: -122.345528,
-            name:'Anns House',
-            rsvpCount: 45,
-            time: 1396551600000,
-            url:'http://www.meetup.com/Raise-Your-Glass-Networking-for-Women-Entrepreneurs/events/169780002/',
+            description: item.description,
+            duration: item.duration,
+            fee: item.fee.amount,
+            name: item.name,
+            rsvpCount: item.yes_rsvp_count,
+            time: item.time,
+            url: item.event_url,
             venue: {
-              name: 'Women, Wine, Wisdom: Networking for Women Entrepreneurs',
+              name: item.venue.name,
               address: {
-                city:'San Francisco',
-                country:'US',
-                state:'CA',
-                address1:'651 Brannan St',
-                address2:'#110'
+                city: item.venue.city,
+                country: item.venue.country,
+                state: item.venue.state,
+                address1: item.venue.address_1,
+                latitude: item.venue.latitude,
+                longitude: item.venue.longitude,
               }
-            }
+            },
+            unique: item.event_url
           };
         });
-
-
-        db.meetup.insert(results)
-        .then(function(item){
-          console.log("inserted", item);
-        })
-        .catch(function(err){
-          console.log("crash", err);
-          process.exit(1);
+        console.log("results start date:", new Date(results[0].time));
+        console.log("results end date:", new Date(results[results.length-1].time));
+        if(recursiveCount >= 1){
+          var newStart = results[results.length-1].time - 2*60*60*1000; //searches again using end time, minus 2 hours to ensure we don't miss any
+          getResults(lat, lon, radius, newStart,recursiveCount-1);
+        }
+        _.each(results, function(item){
+          db.meetup.findOne({unique: item.unique})
+          .then(function(entry){
+            // console.log("item", entry);
+            if(!entry){
+              console.log("item not found -- inserting");
+              db.meetup.insert(item);
+            }else{
+              console.log("item already found -- updating");
+              db.meetup.save(item);
+            }
+          })
+          .catch(function(err){
+            console.log("crash", err);
+            process.exit(1);
+          });
         });
       }
     });
-  });
+};
 
 
 // db.meetup.insert(newEvent)
