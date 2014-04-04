@@ -41,7 +41,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   }
   console.log("Lat:", data.lat, "Long:", data.lon, "Status: OK");
   var currentDate = new Date().getTime()-24*60*60*1000; //currentTime minus 1 day;
-  getResults(data.lat, data.lon, radius, currentDate, 5);
+  getResults(data.lat, data.lon, radius, currentDate, 99999);
 });
 //recursive function that pulls down data from meetup, then changes the start date and recurses again
 var getResults = function(lat, lon, radius, startDate, recursiveCount){
