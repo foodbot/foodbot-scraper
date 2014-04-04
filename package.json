@@ -1,0 +1,17 @@
+{
+  "name": "scraping",
+  "version": "0.0.0",
+  "description": "scraping scripts",
+  "main": "meetup.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "~1.2.1",
+    "request": "~2.34.0",
+    "underscore": "~1.6.0",
+    "promised-mongo": "~0.9.8"
+  }
+}
