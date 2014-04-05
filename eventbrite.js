@@ -4,7 +4,7 @@ var cheerio = require('cheerio');
 var _ = require('underscore');
 
 var pmongo = require('promised-mongo');
-var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite", "junk"]); // feedmeserver.cloudapp.net
+var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite"]); // feedmeserver.cloudapp.net
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var targetUrl = "http://www.eventbrite.com/directory?loc=San+Francisco%2C+CA&is_miles=True&vp_ne_lat=37.812&slat=37.77&vp_sw_lng=-122.527&slng=-122.42&vp_sw_lat=37.7034&radius=60.0&vp_ne_lng=-122.3482&price=1";
@@ -53,14 +53,6 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
       eventUrls = _.uniq(eventUrls);
       finishCallback(eventUrls);
     }
-  });
-};
-//loads saved urls from db and scrapes them
-//urls are saved for better testing
-var scrapeSavedUrls = function(){
-  db.junk.findOne()
-  .then(function(entry){
-    
   });
 };
 //scrapes target eventbrite event url
