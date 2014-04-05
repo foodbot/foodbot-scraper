@@ -12,6 +12,7 @@
     "bluebird": "~1.2.1",
     "request": "~2.34.0",
     "underscore": "~1.6.0",
-    "promised-mongo": "~0.9.8"
+    "promised-mongo": "~0.9.8",
+    "cheerio": "~0.14.0"
   }
 }
