@@ -11,15 +11,16 @@ var targetUrl = "http://www.eventbrite.com/directory?loc=San+Francisco%2C+CA&is_
 var terminateTimer;
 var eventUrls = [];
 var pageCount = 0;
+var insertCount = 0;
 //need to manually terminate program when scraping complete, since db connection is always open
 var terminateProgram = function(){
-  console.log("Program finished");
+  console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
 //terminates program in 30 sec, if no actions taken
 var refreshTerminateTimer = function(){
   if(terminateTimer){
-    console.log("resetting timer");
+    // console.log("Resetting timer");
     clearTimeout(terminateTimer);
     terminateTimer = null;
   }
@@ -59,16 +60,14 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
 var scrapeSavedUrls = function(){
   db.junk.findOne()
   .then(function(entry){
-    _.each(entry.urls, function(item){
-      scrapeEventPage(item);
-    });
+    
   });
 };
 //scrapes target eventbrite event url
-var scrapeEventPage = function(url){
+var scrapeEventPage = function(url, index){
   request.getAsync(url)
   .then(function(args){
-    console.log("GET:", url);
+    console.log("GET["+index+"]:", url);
     var $ = cheerio.load(args[1]);
     var address = $("span.adr").text().trim().replace(/(\r\n|\n|\r)/gm,"").replace(/\s+/g, " ") ||
                   $(".l-block-3 li").first().text().trim().replace(/(\r\n|\n|\r)/gm,"").replace(/\s+/g, " ");
@@ -113,11 +112,13 @@ var scrapeEventPage = function(url){
       }
       db.eventbrite.findOne({unique: item.unique})
       .then(function(entry){
+        refreshTerminateTimer();
+        insertCount++;
         if(!entry){
-          console.log("Inserting:", item);
+          // console.log("Inserting:", item);
           db.eventbrite.insert(item);
         }else{
-          console.log("Updating:", item);
+          // console.log("Updating:", item);
           db.eventbrite.update({unique: item.event_url}, item);
         }
       })
@@ -129,12 +130,12 @@ var scrapeEventPage = function(url){
   });
 };
 
-getEventLinks(targetUrl, 2, function(urls){
-  db.junk.drop();
-  db.junk.insert({urls: urls})
-  .then(function(items){
-    console.log("Successfully inserted", items.length ,"element(s)");
-    scrapeSavedUrls();
+getEventLinks(targetUrl, 99999, function(urls){
+  _.each(urls, function(url, index){
+    //Spaced them out so I don't DoS them
+    setTimeout(function(){
+      scrapeEventPage(url, index);
+    }, index*500);
   });
 });
 
