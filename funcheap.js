@@ -79,6 +79,9 @@ var scrapeEventPage = function(url, index){
       return $(item).text().match(/Address:/);
     }).text().split(":")[1].trim();
 
+    var price = $("#stats").text().split(" | ")[1].match(/\$\d+/) || ["$0"];
+    price = parseFloat(price[0].split("$")[1]);
+    
     var duration = 3*60*60*1000;
     var startTime = new Date($("span.left").first().text().split(" | ")[0].split(" to ")[0].replace(" - ", " ")).getTime();
 
@@ -90,9 +93,9 @@ var scrapeEventPage = function(url, index){
     }
     var item = {
       name: $("h1.title").text().split(" | ")[0],
-      description: "description",
+      description: description,
       duration: duration,
-      fee: null,
+      fee: price,
       rsvpCount: null,
       time: startTime,
       url: url,
