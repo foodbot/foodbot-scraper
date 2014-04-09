@@ -28,19 +28,22 @@ var refreshTerminateTimer = function(){
 };
 //recursively get urls of all event pages from search results
 var getEventLinks = function(url, recursiveCount, finishCallback){
+  var $;
   pageCount++;
   request.getAsync(url)
   .then(function(args){
-    var $ = cheerio.load(args[1]);
-
-    var links = $(".js-search-result-click-action").toArray();
-    links = _.map(links, function(item){
-      var url = $(item).attr('href');
-      return url.split("?")[0]; //doesn't return extra query parameters on url
-    });
-    links = _.uniq(links);
+    $ = cheerio.load(args[1]);
+    return $(".js-search-result-click-action").toArray();
+  })
+  .map(function(link){
+    var url = $(link).attr('href');
+    return url.split("?")[0]; 
+  })
+  .then(function(links){
+    return _.uniq(links);
+  })
+  .then(function(links){
     console.log("Links Found:", links.length);
-
     eventUrls = eventUrls.concat(links);
 
     var nextPagePath = $("#next.nav").attr('href');
@@ -90,39 +93,46 @@ var scrapeEventPage = function(url, index){
       },
       unique: url
     };
-    request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:address}})
-    .then(function(args){
-      var body = JSON.parse(args[1]);
-      if(body.status === "OK"){
-        var lat = body.results[0].geometry.location.lat;
-        var lon = body.results[0].geometry.location.lng;
-        item.venue.address.latitude = lat;
-        item.venue.address.longitude = lon;
-        // console.log("Status: OK, lat: ",lat,"lon:",lon);
-      }else {
-        console.log("API Error:", body.status);
-      }
-      db.eventbrite.findOne({unique: item.unique})
-      .then(function(entry){
-        refreshTerminateTimer();
-        insertCount++;
-        if(!entry){
-          // console.log("Inserting:", item);
-          db.eventbrite.insert(item);
-        }else{
-          // console.log("Updating:", item);
-          db.eventbrite.update({unique: item.event_url}, item);
-        }
-      })
-      .catch(function(err){
-        console.log("DB error:", err);
-      });
-    });
-    
+    return Promise.all([
+      request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:address}}),
+      item
+    ]);
+  })
+  .spread(function(args, item){
+    var body = JSON.parse(args[1]);
+    if(body.status === "OK"){
+      var lat = body.results[0].geometry.location.lat;
+      var lon = body.results[0].geometry.location.lng;
+      item.venue.address.latitude = lat;
+      item.venue.address.longitude = lon;
+      return item;
+    }else {
+      throw "API Error: "+body.status;
+    }
+  })
+  .then(function(item){
+    return Promise.all([
+      db.eventbrite.findOne({unique: item.unique}),
+      item
+    ]);
+  })
+  .spread(function(entry, item){
+    refreshTerminateTimer();
+    insertCount++;
+    if(!entry){
+      // console.log("Inserting:", item);
+      return db.eventbrite.insert(item);
+    }else{
+      // console.log("Updating:", item);
+      return db.eventbrite.update({unique: item.event_url}, item);
+    }
+  })
+  .catch(function(err){
+    console.log("Err:", err);
   });
 };
 
-getEventLinks(targetUrl, 99999, function(urls){
+getEventLinks(targetUrl, 2, function(urls){
   _.each(urls, function(url, index){
     //Spaced them out so I don't DoS them
     setTimeout(function(){
