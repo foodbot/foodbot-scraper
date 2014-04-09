@@ -4,7 +4,7 @@ var cheerio = require('cheerio');
 var _ = require('underscore');
 
 var pmongo = require('promised-mongo');
-var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite"]); // feedmeserver.cloudapp.net
+var db = pmongo('mongodb://localhost:27017/feedme', ["funcheap"]); // feedmeserver.cloudapp.net
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var targetUrl = "http://sf.funcheap.com/category/event/event-types/free-food/";
@@ -47,7 +47,7 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
     var nextPagePath = $("#next.nav").attr('href'); //placeholder
     // console.log("Next Path:", nextPagePath);
     if(recursiveCount > 1 && nextPagePath){
-      getEventLinks("http://www.eventbrite.com"+nextPagePath, recursiveCount-1, finishCallback);
+      getEventLinks("http://www.funcheap.com"+nextPagePath, recursiveCount-1, finishCallback);
     }else{
       console.log("Loaded "+pageCount+" pages and "+eventUrls.length+" event urls");
       eventUrls = _.uniq(eventUrls);
@@ -55,26 +55,45 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
     }
   });
 };
-//scrapes target eventbrite event url
+//scrapes target funcheap event url
 var scrapeEventPage = function(url, index){
   request.getAsync(url)
   .then(function(args){
     console.log("GET["+index+"]:", url);
     var $ = cheerio.load(args[1]);
-    var address = $("span.adr").text().trim().replace(/(\r\n|\n|\r)/gm,"").replace(/\s+/g, " ") ||
-                  $(".l-block-3 li").first().text().trim().replace(/(\r\n|\n|\r)/gm,"").replace(/\s+/g, " ");
-    var venueName = $(".fn.org").text().trim() ||
-                    $(".l-block-3 h2").first().text().trim();
-    var startTime = new Date($("span.dtstart").text().trim().split(" to ")[0].replace(" from", "")).getTime() ||
-                    new Date($("span.dtstart").text().trim().split(" - ")[0].replace(" at", "")).getTime() ||
-                    new Date($("time").first().text().trim().split(" to ")[0].replace(" from", "")).getTime();
-    var endTime;
+
+    var description = 
+    $(".entry p").map(function(index, item){
+      if(! $(item).is(".head-share-this p")){
+        return $(item).text();
+      }
+    }).toArray().join(" ").trim();
+
+    var venueName = 
+    $(".entry").find("div").filter(function(index, item){
+      return $(item).text().match(/Venue:/);
+    }).text().split(":")[1].trim();
+
+    var address = 
+    $(".entry").find("div").filter(function(index, item){
+      return $(item).text().match(/Address:/);
+    }).text().split(":")[1].trim();
+
+    var duration = 3*60*60*1000;
+    var startTime = new Date($("span.left").first().text().split(" | ")[0].split(" to ")[0].replace(" - ", " ")).getTime();
+
+    if(!startTime){
+      startTime = new Date($("span.left").first().text().split(" | ")[0].split(" - ")[0]).getTime();
+      if($("span.left").first().text().split(" | ")[0].split(" - ")[1].toUpperCase() === "ALL DAY"){
+        duration = 24*60*60*1000; 
+      }
+    }
     var item = {
-      name: $("#event_header h1").text(),
-      description: $(".panel_section").text(),
-      duration: 3*60*60*1000,
+      name: $("h1.title").text().split(" | ")[0],
+      description: "description",
+      duration: duration,
       fee: null,
-      rsvpCount: parseInt($(".count_subview").text().trim().split(" people")[0]),
+      rsvpCount: null,
       time: startTime,
       url: url,
       venue: {
@@ -90,45 +109,51 @@ var scrapeEventPage = function(url, index){
       },
       unique: url
     };
-    request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:address}})
-    .then(function(args){
-      var body = JSON.parse(args[1]);
-      if(body.status === "OK"){
-        var lat = body.results[0].geometry.location.lat;
-        var lon = body.results[0].geometry.location.lng;
-        item.venue.address.latitude = lat;
-        item.venue.address.longitude = lon;
-        // console.log("Status: OK, lat: ",lat,"lon:",lon);
-      }else {
-        console.log("API Error:", body.status);
-      }
-      db.eventbrite.findOne({unique: item.unique})
-      .then(function(entry){
-        refreshTerminateTimer();
-        insertCount++;
-        if(!entry){
-          // console.log("Inserting:", item);
-          db.eventbrite.insert(item);
-        }else{
-          // console.log("Updating:", item);
-          db.eventbrite.update({unique: item.event_url}, item);
-        }
-      })
-      .catch(function(err){
-        console.log("DB error:", err);
-      });
-    });
-    
+    return Promise.all([
+      request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:address}}),
+      item
+    ]);
+  })
+  .spread(function(args, item){
+    var body = JSON.parse(args[1]);
+    if(body.status === "OK"){
+      var lat = body.results[0].geometry.location.lat;
+      var lon = body.results[0].geometry.location.lng;
+      item.venue.address.latitude = lat;
+      item.venue.address.longitude = lon;
+      return item;
+    }else {
+      throw "API Error: "+body.status;
+    }
+  })
+  .then(function(item){
+    return Promise.all([
+      db.funcheap.findOne({unique: item.unique}),
+      item
+    ]);
+  })
+  .spread(function(entry, item){
+    refreshTerminateTimer();
+    insertCount++;
+    if(!entry){
+      console.log("Inserting:", item);
+      return db.funcheap.insert(item);
+    }else{
+      console.log("Updating:", item);
+      return db.funcheap.update({unique: item.unique}, item);
+    }
+  })
+  .catch(function(err){
+    console.log("Err:", err);
   });
 };
 
 getEventLinks(targetUrl, 99999, function(urls){
   _.each(urls, function(url, index){
-    console.log(url);
     //Spaced them out so I don't DoS them
-    // setTimeout(function(){
-    //   scrapeEventPage(url, index);
-    // }, index*500);
+    setTimeout(function(){
+      scrapeEventPage(url, index);
+    }, index*500);
   });
 });
 

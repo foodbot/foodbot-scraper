@@ -120,7 +120,6 @@ var scrapeEventPage = function(url, index){
     refreshTerminateTimer();
     insertCount++;
     if(!entry){
-      // console.log("Inserting:", item);
       return db.eventbrite.insert(item);
     }else{
       // console.log("Updating:", item);
