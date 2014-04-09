@@ -139,10 +139,10 @@ var scrapeEventPage = function(url, index){
     refreshTerminateTimer();
     insertCount++;
     if(!entry){
-      console.log("Inserting:", item);
+      // console.log("Inserting:", item);
       return db.funcheap.insert(item);
     }else{
-      console.log("Updating:", item);
+      // console.log("Updating:", item);
       return db.funcheap.update({unique: item.unique}, item);
     }
   })
