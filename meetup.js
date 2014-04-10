@@ -8,24 +8,25 @@ var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var meetupApiKey = process.env.MEETUPAPIKEY || "123FAKEKEY";
 var radius = "50"; //in miles
 var targetAddress = "San Francisco";
+var insertCount = 0;
 var terminateTimer;
 //need to manually terminate program when scraping complete, since db connection is always open
 var terminateProgram = function(){
-  console.log("Program finished");
+  console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
 //terminates program in 30 sec, if no actions taken
 var refreshTerminateTimer = function(){
   if(terminateTimer){
-    console.log("resetting timer");
     clearTimeout(terminateTimer);
     terminateTimer = null;
   }
   terminateTimer = setTimeout(terminateProgram, 30*1000);
 };
+
 request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}})
-.then(function(response){
-  var body = JSON.parse(response[0].body);
+.then(function(args){
+  var body = JSON.parse(args[0].body);
   if(body.status === "OK"){
     var lat = body.results[0].geometry.location.lat;
     var lon = body.results[0].geometry.location.lng;
@@ -43,6 +44,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   var currentDate = new Date().getTime()-24*60*60*1000; //currentTime minus 1 day;
   getResults(data.lat, data.lon, radius, currentDate, 99999);
 });
+
 //recursive function that pulls down data from meetup, then changes the start date and recurses again
 var getResults = function(lat, lon, radius, startDate, recursiveCount){
   if(recursiveCount === undefined){
@@ -57,74 +59,71 @@ var getResults = function(lat, lon, radius, startDate, recursiveCount){
     return; //ends recursive loop
   }
   console.log("Trying to get results from meetup:", new Date(startDate));
-  request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:lat, lon:lon, radius:radius, limited_events:"false", text_format:"plain", time:(startDate+",")}})
-  .then(function(response){
-    var body = JSON.parse(response[0].body);
-    var results = body.results;
+  request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:lat, lon:lon, radius:radius, limited_events:"false", text_format:"plain", time:startDate+","} })
+  .then(function(args){
+    var results = JSON.parse(args[0].body).results;
     console.log("Results length:", results.length);
     if(results){
-      //formats results into normalized database entry 
-      results = _.map(results, function(item){
-        item.venue = item.venue || {};
-        item.fee = item.fee || {};
-        return {
-          name: item.name,
-          description: item.description,
-          duration: item.duration,
-          fee: item.fee.amount,
-          rsvpCount: item.yes_rsvp_count,
-          time: item.time,
-          url: item.event_url,
-          venue: {
-            name: item.venue.name,
-            address: {
-              city: item.venue.city,
-              country: item.venue.country,
-              state: item.venue.state,
-              address1: item.venue.address_1,
-              latitude: item.venue.lat,
-              longitude: item.venue.lon,
-            }
-          },
-          unique: item.event_url
-        };
-      });
-      console.log("Results start date:", new Date(results[0].time));
-      console.log("Results end date:", new Date(results[results.length-1].time));
-      if(recursiveCount >= 1){
-        var newStart = results[results.length-1].time - 2*60*60*1000; //searches again using end time, minus 2 hours to ensure we don't miss any
-        getResults(lat, lon, radius, newStart,recursiveCount-1);
-      }
-      _.each(results, function(item){
-        db.meetup.findOne({unique: item.unique})
-        .then(function(entry){
-          if(!entry){
-            // console.log("item not found -- inserting");
-            db.meetup.insert(item);
-          }else{
-            // console.log("item already found -- updating");
-            db.meetup.update({unique: item.event_url}, item);
-          }
-        })
-        .catch(function(err){
-          console.log("crash", err);
-          process.exit(1);
-        });
-      });
+     return results;
+    }else{
+      throw "Results Undefined Error - "+results;
     }
+  })
+  .map(function(item){
+    item.venue = item.venue || {};
+    item.fee = item.fee || {};
+    return {
+      name: item.name,
+      description: item.description,
+      duration: item.duration,
+      fee: item.fee.amount,
+      rsvpCount: item.yes_rsvp_count,
+      time: item.time,
+      url: item.event_url,
+      venue: {
+        name: item.venue.name,
+        address: {
+          city: item.venue.city,
+          country: item.venue.country,
+          state: item.venue.state,
+          address1: item.venue.address_1,
+          latitude: item.venue.lat,
+          longitude: item.venue.lon,
+        }
+      },
+      unique: item.event_url
+    };
+  })
+  .then(function (results){
+    console.log("Results start date:", new Date(results[0].time));
+    console.log("Results end date:", new Date(results[results.length-1].time));
+    if(recursiveCount > 1){
+      var newStart = results[results.length-1].time - 2*60*60*1000; //searches again using end time, minus 2 hours to ensure we don't miss any
+      getResults(lat, lon, radius, newStart,recursiveCount-1);
+    }
+    return results;
+  })
+  .then(function(results){
+    _.each(results, function(item){
+      db.meetup.findOne({unique: item.unique})
+      .then(function(entry){
+        insertCount++;
+        if(!entry){
+          // console.log("item not found -- inserting");
+          db.meetup.insert(item);
+        }else{
+          // console.log("item already found -- updating");
+          db.meetup.update({unique: item.event_url}, item);
+        }
+      }).catch(function(err){
+        console.log("crash", err);
+        process.exit(1);
+      });
+    });
+  })
+  .catch(function(err){
+    console.log("ERR:", err);
   });
 };
-
-
-// db.meetup.insert(newEvent)
-// .then(function(item){
-//   console.log("inserted", newEvent);
-// })
-// .catch(function(err){
-//   console.log("crash", err);
-//   process.exit(1);
-// });
-
-
 
 
