@@ -18,14 +18,6 @@ var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
-//terminates program in 30 sec, if no actions taken
-var refreshTerminateTimer = function(){
-  if(terminateTimer){
-    clearTimeout(terminateTimer);
-    terminateTimer = null;
-  }
-  terminateTimer = setTimeout(terminateProgram, 30*1000);
-};
 //gets all events at the location and adds id to eventIds
 var getEventIdsByLocationName = function(name){
   var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+facebookApiKey;
@@ -71,6 +63,10 @@ var getPlaces = function(apiURL, recursiveCount, finishCallback){
       console.log("Total location Ids:", locationNames.length);
       finishCallback(locationNames);
     }
+  })
+  .catch(function(err){
+    console.log("ERR:", err);
+    terminateProgram();
   });
 };
 var getPlacesAsync = function(apiURL, recursiveCount){
@@ -132,7 +128,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   var eventPromises = [];
   console.log("Getting "+places.length+" EventIdsByLocationName..");
   
-  //delays to prevent denial of service
+  //delayed to prevent denial of service
   _.each(places, function(place, index){
     var promise = Promise.delay(100*index).then(function(){
       return getEventIdsByLocationName(place);
@@ -161,9 +157,48 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
 })
 .then(function(){
   console.log("Total Events:", events.length);
-  _.each(events, function(item){
-    //add to db
+  console.log("Trying to load events into DB..");
+  var eventPromises = _.map(events, function(item){
+    //add to db 
+    var fee = null;
+    if(item.ticket_uri){
+      fee = 99999;
+    }
+    var dbItem = {
+      name: item.name,
+      description: item.description,
+      duration: (new Date(item.startTime).getTime() - new Date(item.endTime).getTime()) || 3*60*60*1000,
+      fee: fee,
+      rsvpCount: item.attending_count,
+      time: new Date(item.startTime).getTime(),
+      url: "https://www.facebook.com/events/"+item.eid+"/",
+      venue: {
+        name: item.location,
+        address: {
+          city: item.venue.city,
+          country: item.venue.country,
+          state: item.venue.state,
+          address1: item.venue.street +", "+item.venue.city,
+          latitude: item.venue.latitude,
+          longitude: item.venue.longitude,
+        }
+      },
+      unique: item.eid
+    };
+
+    return db.facebook.findOne({unique: item.unique})
+    .then(function(entry){
+      insertCount++;
+      if(!entry){
+        return db.facebook.insert(dbItem);
+      }else{
+        return db.facebook.update({unique: item.unique}, dbItem);
+      }
+    });
   });
+  return Promise.all(eventPromises);
+})
+.then(function(){
   terminateProgram();
 })
 .catch(function(err){
