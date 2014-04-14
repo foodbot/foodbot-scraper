@@ -17,15 +17,6 @@ var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
-//terminates program in 30 sec, if no actions taken
-var refreshTerminateTimer = function(){
-  if(terminateTimer){
-    // console.log("Resetting timer");
-    clearTimeout(terminateTimer);
-    terminateTimer = null;
-  }
-  terminateTimer = setTimeout(terminateProgram, 30*1000);
-};
 //recursively get urls of all event pages from search results
 var getEventLinks = function(url, recursiveCount, finishCallback){
   var $;
@@ -55,9 +46,14 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
     }
   });
 };
+var getEventLinksAsync = function(url, recursiveCount){
+  return new Promise(function(resolve, reject){
+    getEventLinks(url, recursiveCount, resolve);
+  });
+};
 //scrapes target funcheap event url
 var scrapeEventPage = function(url, index){
-  request.getAsync(url)
+  return request.getAsync(url)
   .then(function(args){
     console.log("GET["+index+"]:", url);
     var $ = cheerio.load(args[1]);
@@ -136,7 +132,6 @@ var scrapeEventPage = function(url, index){
     ]);
   })
   .spread(function(entry, item){
-    refreshTerminateTimer();
     insertCount++;
     if(!entry){
       // console.log("Inserting:", item);
@@ -151,13 +146,19 @@ var scrapeEventPage = function(url, index){
   });
 };
 
-getEventLinks(targetUrl, 99999, function(urls){
-  _.each(urls, function(url, index){
+getEventLinksAsync(targetUrl, 99999)
+.then(function(urls){
+  var eventPromises = _.map(urls, function(url, index){
     //Spaced them out so I don't DoS them
-    setTimeout(function(){
-      scrapeEventPage(url, index);
-    }, index*500);
+    return Promise.delay(100*index)
+    .then(function(){
+      return scrapeEventPage(url, index);
+    });
   });
+  return Promise.all(eventPromises);
+})
+.then(function(){
+  terminateProgram();
 });
 
 
