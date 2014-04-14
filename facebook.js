@@ -164,13 +164,14 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     if(item.ticket_uri){
       fee = 99999;
     }
+    console.log(item);
     var dbItem = {
       name: item.name,
       description: item.description,
-      duration: (new Date(item.startTime).getTime() - new Date(item.endTime).getTime()) || 3*60*60*1000,
+      duration: (new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) || 3*60*60*1000,
       fee: fee,
       rsvpCount: item.attending_count,
-      time: new Date(item.startTime).getTime(),
+      time: new Date(item.start_time).getTime(),
       url: "https://www.facebook.com/events/"+item.eid+"/",
       venue: {
         name: item.location,
@@ -186,13 +187,13 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
       unique: item.eid
     };
 
-    return db.facebook.findOne({unique: item.unique})
+    return db.facebook.findOne({unique: dbItem.unique})
     .then(function(entry){
       insertCount++;
       if(!entry){
         return db.facebook.insert(dbItem);
       }else{
-        return db.facebook.update({unique: item.unique}, dbItem);
+        return db.facebook.update({unique: dbItem.unique}, dbItem);
       }
     });
   });
