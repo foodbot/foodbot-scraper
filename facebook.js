@@ -125,31 +125,26 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   return getPlacesAsync(url, 2);
 })
 .then(function(places){
-  var eventPromises = [];
   console.log("Getting "+places.length+" EventIdsByLocationName..");
-
   //delayed to prevent denial of service
-  _.each(places, function(place, index){
-    var promise = Promise.delay(100*index).then(function(){
+  var eventPromises = _.map(places, function(place, index){
+    return Promise.delay(100*index).then(function(){
       return getEventIdsByLocationName(place);
     });
-    eventPromises.push(promise);
   });
 
   //populates global eventIds array
   return Promise.all(eventPromises);
 })
 .then(function(){
-  var eventPromises = [];
   var superArray = arraySplit(eventIds, 1000);
   console.log("eventIds length:",eventIds.length);
 
   //delays to prevent denial of service
-  _.each(superArray, function(eids, index){
-    var promise = Promise.delay(100*index).then(function(){
+  var eventPromises = _.map(superArray, function(eids, index){
+    return Promise.delay(100*index).then(function(){
       return getEvents(eids);
     });
-    eventPromises.push(promise);
   });
 
   //populates global events array
