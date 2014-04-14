@@ -127,7 +127,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
 .then(function(places){
   var eventPromises = [];
   console.log("Getting "+places.length+" EventIdsByLocationName..");
-  
+
   //delayed to prevent denial of service
   _.each(places, function(place, index){
     var promise = Promise.delay(100*index).then(function(){
@@ -184,6 +184,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
           longitude: item.venue.longitude,
         }
       },
+      ticketUrl: item.ticket_uri || null,
       unique: item.eid
     };
 
