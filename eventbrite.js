@@ -7,8 +7,6 @@ var pmongo = require('promised-mongo');
 var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite"]); // feedmeserver.cloudapp.net
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
-var targetUrl = "http://www.eventbrite.com/directory?loc=San+Francisco%2C+CA&is_miles=True&vp_ne_lat=37.812&slat=37.77&vp_sw_lng=-122.527&slng=-122.42&vp_sw_lat=37.7034&radius=60.0&vp_ne_lng=-122.3482&price=1";
-var terminateTimer;
 var eventUrls = [];
 var pageCount = 0;
 var insertCount = 0;
@@ -19,15 +17,6 @@ var getSearchPageUrl = function(pageNum){
 var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
-};
-//terminates program in 30 sec, if no actions taken
-var refreshTerminateTimer = function(){
-  if(terminateTimer){
-    // console.log("Resetting timer");
-    clearTimeout(terminateTimer);
-    terminateTimer = null;
-  }
-  terminateTimer = setTimeout(terminateProgram, 30*1000);
 };
 //recursively get urls of all event pages from search results
 var getEventLinks = function(pageNum, recursiveCount, finishCallback){
@@ -51,9 +40,6 @@ var getEventLinks = function(pageNum, recursiveCount, finishCallback){
     console.log("Links Found:", links.length);
     eventUrls = eventUrls.concat(links);
 
-    // var nextPagePath = $("#next.nav").attr('href');
-    
-    
     if(recursiveCount > 1 && links.length > 0){
       getEventLinks(pageNum+1, recursiveCount-1, finishCallback);
     }else{
@@ -61,11 +47,19 @@ var getEventLinks = function(pageNum, recursiveCount, finishCallback){
       eventUrls = _.uniq(eventUrls);
       finishCallback(eventUrls);
     }
+  })
+  .catch(function(err){
+    console.log("ERR:", err);
+  });
+};
+var getEventLinksAsync = function(pageNum, recursiveCount){
+  return new Promise(function(resolve, reject){
+    getEventLinks(pageNum, recursiveCount, resolve);
   });
 };
 //scrapes target eventbrite event url
 var scrapeEventPage = function(url, index){
-  request.getAsync(url)
+  return request.getAsync(url)
   .then(function(args){
     console.log("GET["+index+"]:", url);
     var $ = cheerio.load(args[1]);
@@ -122,27 +116,29 @@ var scrapeEventPage = function(url, index){
     ]);
   })
   .spread(function(entry, item){
-    refreshTerminateTimer();
     insertCount++;
     if(!entry){
       return db.eventbrite.insert(item);
     }else{
-      // console.log("Updating:", item);
-      return db.eventbrite.update({unique: item.event_url}, item);
+      return db.eventbrite.update({unique: item.unique}, item);
     }
-  })
-  .catch(function(err){
-    console.log("Err:", err);
   });
 };
 
-getEventLinks(1, 99999, function(urls){
-  _.each(urls, function(url, index){
+getEventLinksAsync(1, 10)
+.then(function(urls){
+  var eventPromises = _.map(urls, function(url, index){
     //Spaced them out so I don't DoS them
-    setTimeout(function(){
-      scrapeEventPage(url, index);
-    }, index*500);
+    return Promise.delay(index*300).then(function(){
+      return scrapeEventPage(url, index);
+    });
   });
+  return Promise.all(eventPromises);
+})
+.then(function(){
+  terminateProgram();  
+})
+.catch(function(err){
+  console.log("Err:", err);
 });
-
 

@@ -159,7 +159,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     if(item.ticket_uri){
       fee = 99999;
     }
-    console.log(item);
+    // console.log(item);
     var dbItem = {
       name: item.name,
       description: item.description,
