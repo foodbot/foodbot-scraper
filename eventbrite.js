@@ -12,6 +12,9 @@ var terminateTimer;
 var eventUrls = [];
 var pageCount = 0;
 var insertCount = 0;
+var getSearchPageUrl = function(pageNum){
+  return "http://www.eventbrite.com/directory?loc=San+Francisco%2C+CA&is_miles=True&vp_ne_lat=37.812&price=1&vp_sw_lng=-122.527&page="+pageNum+"&slng=-122.42&vp_sw_lat=37.7034&radius=60.0&vp_ne_lng=-122.3482&slat=37.77";
+};
 //need to manually terminate program when scraping complete, since db connection is always open
 var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
@@ -27,8 +30,10 @@ var refreshTerminateTimer = function(){
   terminateTimer = setTimeout(terminateProgram, 30*1000);
 };
 //recursively get urls of all event pages from search results
-var getEventLinks = function(url, recursiveCount, finishCallback){
+var getEventLinks = function(pageNum, recursiveCount, finishCallback){
+  var url = getSearchPageUrl(pageNum);
   var $;
+  console.log("GET Search Page:", pageNum);
   pageCount++;
   request.getAsync(url)
   .then(function(args){
@@ -46,11 +51,11 @@ var getEventLinks = function(url, recursiveCount, finishCallback){
     console.log("Links Found:", links.length);
     eventUrls = eventUrls.concat(links);
 
-    var nextPagePath = $("#next.nav").attr('href');
-    console.log("Next Path:", nextPagePath);
+    // var nextPagePath = $("#next.nav").attr('href');
     
-    if(recursiveCount > 1 && nextPagePath){
-      getEventLinks("http://www.eventbrite.com"+nextPagePath, recursiveCount-1, finishCallback);
+    
+    if(recursiveCount > 1 && links.length > 0){
+      getEventLinks(pageNum+1, recursiveCount-1, finishCallback);
     }else{
       console.log("Loaded "+pageCount+" pages and "+eventUrls.length+" event urls");
       eventUrls = _.uniq(eventUrls);
@@ -131,7 +136,7 @@ var scrapeEventPage = function(url, index){
   });
 };
 
-getEventLinks(targetUrl, 2, function(urls){
+getEventLinks(1, 99999, function(urls){
   _.each(urls, function(url, index){
     //Spaced them out so I don't DoS them
     setTimeout(function(){
