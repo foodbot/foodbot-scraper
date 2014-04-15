@@ -4,7 +4,7 @@ var cheerio = require('cheerio');
 var _ = require('underscore');
 
 var pmongo = require('promised-mongo');
-var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite"]); // feedmeserver.cloudapp.net
+var db = pmongo('mongodb://localhost:27017/feedme', ["eventbrite"]);
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var eventUrls = [];

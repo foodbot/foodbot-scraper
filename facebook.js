@@ -2,7 +2,7 @@ var Promise = require('bluebird');
 var request = Promise.promisifyAll(require('request'));
 var _ = require('underscore');
 var pmongo = require('promised-mongo');
-var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]); // feedmeserver.cloudapp.net
+var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]);
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var facebookApiKey = process.env.FACEBOOKAPIKEY || "123FAKEKEY";
