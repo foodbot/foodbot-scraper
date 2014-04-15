@@ -8,7 +8,6 @@ var db = pmongo('mongodb://localhost:27017/feedme', ["funcheap"]); // feedmeserv
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var targetUrl = "http://sf.funcheap.com/category/event/event-types/free-food/";
-var terminateTimer;
 var eventUrls = [];
 var pageCount = 0;
 var insertCount = 0;
@@ -141,16 +140,13 @@ var scrapeEventPage = function(url, index){
       return db.funcheap.update({unique: item.unique}, item);
     }
   })
-  .catch(function(err){
-    console.log("Err:", err);
-  });
 };
 
 getEventLinksAsync(targetUrl, 99999)
 .then(function(urls){
   var eventPromises = _.map(urls, function(url, index){
     //Spaced them out so I don't DoS them
-    return Promise.delay(100*index)
+    return Promise.delay(250*index)
     .then(function(){
       return scrapeEventPage(url, index);
     });
@@ -159,6 +155,9 @@ getEventLinksAsync(targetUrl, 99999)
 })
 .then(function(){
   terminateProgram();
+})
+.catch(function(err){
+  console.log("ERR:", err);
 });
 
 
