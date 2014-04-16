@@ -125,7 +125,7 @@ var scrapeEventPage = function(url, index){
   });
 };
 
-getEventLinksAsync(1, 10)
+getEventLinksAsync(1, 99999)
 .then(function(urls){
   var eventPromises = _.map(urls, function(url, index){
     //Spaced them out so I don't DoS them
