@@ -67,9 +67,9 @@ var scrapeEventPage = function(url, index){
                   $(".l-block-3 li").first().text().trim().replace(/(\r\n|\n|\r)/gm,"").replace(/\s+/g, " ");
     var venueName = $(".fn.org").text().trim() ||
                     $(".l-block-3 h2").first().text().trim();
-    var startTime = new Date($("span.dtstart").text().trim().split(" to ")[0].replace(" from", "")).getTime() ||
-                    new Date($("span.dtstart").text().trim().split(" - ")[0].replace(" at", "")).getTime() ||
-                    new Date($("time").first().text().trim().split(" to ")[0].replace(" from", "")).getTime();
+    var startTime = new Date($("span.dtstart").text().trim().split(" to ")[0].replace(" from", "") +" PDT").getTime() ||
+                    new Date($("span.dtstart").text().trim().split(" - ")[0].replace(" at", "")+" PDT").getTime() ||
+                    new Date($("time").first().text().trim().split(" to ")[0].replace(" from", "")+" PDT").getTime();
     var endTime;
     var item = {
       name: $("#event_header h1").text(),

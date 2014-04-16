@@ -78,7 +78,7 @@ var scrapeEventPage = function(url, index){
     price = parseFloat(price[0].split("$")[1]);
     
     var duration = 3*60*60*1000;
-    var startTime = new Date($("span.left").first().text().split(" | ")[0].split(" to ")[0].replace(" - ", " ")).getTime();
+    var startTime = new Date($("span.left").first().text().split(" | ")[0].split(" to ")[0].replace(" - ", " ") +" PDT").getTime();
 
     if(!startTime){
       startTime = new Date($("span.left").first().text().split(" | ")[0].split(" - ")[0]).getTime();
