@@ -16,33 +16,36 @@ var terminateProgram = function(){
   process.exit(1);
 };
 //recursive promise that pulls down data from meetup, then changes the start date and recurses again
-var getResults = function(lat, lon, radius, startDate, recursiveCount){
+var getResults = function(lat, lon, radius, startDate, status, recursiveCount){
   if(recursiveCount === undefined){
      recursiveCount = 99999;
   }
+  status = status || "upcoming";
   console.log("Trying to get results from meetup:", new Date(startDate));
-  return request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:lat, lon:lon, radius:radius, limited_events:"false", text_format:"plain", time:startDate+","} })
+  
+  return request.getAsync({url:"https://api.meetup.com/2/open_events.json", qs:{key:meetupApiKey, lat:lat, lon:lon, radius:radius, limited_events:"false", text_format:"plain", status: status, time:startDate+","} })
   .spread(function(res, body){
-    var results = JSON.parse(body).results;
-    console.log("Results length:", results.length);
-    if(results){
-     return results;
-    }else{
-      throw "getResults - "+JSON.stringify(body);
+    if(!JSON.parse(body).results){
+      console.log(JSON.parse(body));
     }
+    var results = JSON.parse(body).results || [];
+    console.log("Results length:", results.length);
+    return results;
   })
   .then(function (results){
-    events = events.concat(results);
-    console.log("Results start date:", new Date(results[0].time));
-    console.log("Results end date:", new Date(results[results.length-1].time));
-    var maxDate = new Date().getTime() + 6*30*24*60*60*1000;
-    var newStart = results[results.length-1].time - 2*60*60*1000; //searches again using end time, minus 2 hours to ensure we don't miss any
+    if(results.length > 0){
+      events = events.concat(results);
+      console.log("Results start date:", new Date(results[0].time));
+      console.log("Results end date:", new Date(results[results.length-1].time));
+      var maxDate = new Date().getTime() + 12*30*24*60*60*1000; //current time + 12 months
+      var newStart = results[results.length-1].time - 30*60*1000; //searches again using end time, minus 30 minutes to ensure we don't miss any
 
-    if(recursiveCount > 1 && newStart < maxDate){
-      return getResults(lat, lon, radius, newStart,recursiveCount-1);
-    }
-    if(newStart >= maxDate){
-      console.log("Max Date Reached:", new Date(maxDate));
+      if(recursiveCount > 1 && newStart < maxDate && newStart !== startDate){
+        return getResults(lat, lon, radius, newStart, status,recursiveCount-1);
+      }
+      if(newStart >= maxDate){
+        console.log("Max Date Reached:", new Date(maxDate));
+      }
     }
     return events;
   });
@@ -60,8 +63,14 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     throw "Google API Error -" + body.status;
   }})
 .then(function(data){
-  var currentDate = new Date().getTime()-24*60*60*1000; //currentTime minus 1 day;
-  return getResults(data.lat, data.lon, radius, currentDate, 99999);
+  var currentDate = new Date().getTime()-1*24*60*60*1000; //currentTime minus 1 day;
+  var pastDate = new Date().getTime()-90*24*60*60*1000;  //currentTime minus 366 days;
+  
+  //gets past events, then upcoming events. Note: API only gives you a month back
+  return getResults(data.lat, data.lon, radius, pastDate, "past", 99999) 
+  .then(function(){
+    return getResults(data.lat, data.lon, radius, currentDate, "upcoming", 99999); 
+  });
 })
 .map(function(item){
   item.venue = item.venue || {};
@@ -89,7 +98,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   };
 })
 .then(function(results){
-  console.log("Inserting events into db..");
+  console.log("Inserting "+results.length+" events into db..");
   var eventPromises = _.map(results, function(item){
     return db.meetup.findOne({unique: item.unique})
     .then(function(entry){
