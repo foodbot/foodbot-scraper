@@ -158,6 +158,7 @@ getEventLinksAsync(targetUrl, 99999)
 })
 .catch(function(err){
   console.log("ERR:", err);
+  terminateProgram();
 });
 
 

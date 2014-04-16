@@ -117,6 +117,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
 })
 .catch(function(err){
   console.log("ERR:", err);
+  terminateProgram();
 });
 
 
