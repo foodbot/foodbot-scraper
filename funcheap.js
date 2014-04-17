@@ -121,7 +121,7 @@ var scrapeEventPage = function(url, index){
       item.venue.address.longitude = lon;
       return item;
     }else {
-      throw "API Error: "+body.status;
+      throw "Google API Error: "+body.status;
     }
   })
   .then(function(item){
