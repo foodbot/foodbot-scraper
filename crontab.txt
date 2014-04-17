@@ -1,0 +1,3 @@
+* 17 * * * cd /home/azureuser/feed-me-scraper/ && . ./runFunCheap.sh > logs/funcheap/$(date +\%Y-\%m-\%d_\%H:\%M).txt
+* 20 * * * cd /home/azureuser/feed-me-scraper/ && . ./runEventbrite.sh > logs/eventbrite/$(date +\%Y-\%m-\%d_\%H:\%M).txt
+* 23 * * * cd /home/azureuser/feed-me-scraper/ && . ./runMeetup.sh > logs/meetup/$(date +\%Y-\%m-\%d_\%H:\%M).txt
