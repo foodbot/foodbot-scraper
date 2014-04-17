@@ -5,7 +5,9 @@ var pmongo = require('promised-mongo');
 var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]);
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
-var facebookApiKey = process.env.FACEBOOKAPIKEY || "123FAKEKEY";
+var facebookAppId = process.env.FACEBOOKAPPID;
+var facebookSecret = process.env.FACEBOOKSECRET;
+var facebookToken;
 var radius = "40000"; //in meters
 var targetAddress = "San Francisco";
 var insertCount = 0;
@@ -20,7 +22,7 @@ var terminateProgram = function(){
 };
 //gets all events at the location and adds id to eventIds
 var getEventIdsByLocationName = function(name){
-  var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+facebookApiKey;
+  var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+facebookToken;
   return request.getAsync(url)
   .spread(function(res, body){
     body = JSON.parse(body);
@@ -82,7 +84,7 @@ var getEvents = function(ids){
   eids = eids.join(" OR ");
 
   // console.log("EIDS:", eids);
-  var url = "https://graph.facebook.com/fql?q=SELECT name,description,attending_count,eid,start_time,end_time,location,venue,ticket_uri FROM event WHERE "+eids+"&access_token="+facebookApiKey;
+  var url = "https://graph.facebook.com/fql?q=SELECT name,description,attending_count,eid,start_time,end_time,location,venue,ticket_uri FROM event WHERE "+eids+"&access_token="+facebookToken;
   
   return request.getAsync(url)
   .spread(function(res, body){
@@ -106,9 +108,31 @@ var arraySplit = function(array, targetLength){
   }
   return superArray;
 };
+//promise that fetches the access token from facebook
+var getAccessToken = function(){
+  if (facebookToken){
+    return Promise.join().then(function(){
+      return facebookToken;
+    });
+  }else{
+    return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
+    .spread(function(res, body){
+      var facebookToken = body.split("access_token=")[1] || null;
+      if(!facebookToken){
+        throw "Invalid FB Access Token!";
+      }
+      return facebookToken;
+    });
+  }
+};
 
-//geo-codes the target address and starts the data gathering sequence
-request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}})
+//starts the data gathering sequence
+getAccessToken()
+.then(function(token){
+  console.log("TOKEN", token);
+  //geo-codes the target address 
+  return request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}});
+})
 .spread(function(res, body){
   body = JSON.parse(body);
   if(body.status === "OK"){
@@ -117,11 +141,11 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     console.log("Lat:", lat, "Long:", lon, "Status: OK");
     return {lat: lat, lon:lon};
   }else {
-    throw "API Error: "+body.status;
+    throw "Google API Error: "+body.status;
   }
 })
 .then(function(data){
-  var url = "https://graph.facebook.com/search?q=*&type=place&center="+data.lat+","+data.lon+"&distance="+radius+"&access_token="+facebookApiKey;
+  var url = "https://graph.facebook.com/search?q=*&type=place&center="+data.lat+","+data.lon+"&distance="+radius+"&access_token="+facebookToken;
   return getPlacesAsync(url, 2);
 })
 .then(function(places){
