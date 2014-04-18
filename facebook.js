@@ -7,8 +7,8 @@ var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]);
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var facebookAppId = process.env.FACEBOOKAPPID;
 var facebookSecret = process.env.FACEBOOKSECRET;
-var facebookToken;
-var radius = "40000"; //in meters
+var facebookToken = process.env.FACEBOOKTOKEN || undefined;
+var radius = "7000"; //in meters
 var targetAddress = "San Francisco";
 var insertCount = 0;
 var terminateTimer;
@@ -44,8 +44,9 @@ var getPlaces = function(apiURL, recursiveCount, finishCallback){
   .spread(function(res, body){
     body = JSON.parse(body);
     var results = body.data;
+    // console.log(body);
     body.paging = body.paging || {};
-    nextUrl = body.paging.next;
+    nextUrl = body.paging.next; //never works, limited to 450
 
     if(results){
       console.log("Results length:", results.length);
@@ -62,7 +63,7 @@ var getPlaces = function(apiURL, recursiveCount, finishCallback){
     if(recursiveCount > 1 && nextUrl){
       getPlaces(nextUrl,recursiveCount-1, finishCallback);
     }else{
-      console.log("Total location Ids:", locationNames.length);
+      console.log("Total location Names:", locationNames.length);
       finishCallback(locationNames);
     }
   })
@@ -75,6 +76,10 @@ var getPlacesAsync = function(apiURL, recursiveCount){
   return new Promise(function(resolve,reject){
     getPlaces(apiURL, recursiveCount, resolve);
   });
+};
+var getPlacesAtLocation = function(lat,lon){
+  var url = "https://graph.facebook.com/search?q=a&type=place&center="+lat+","+lon+"&distance="+radius+"&access_token="+facebookToken;
+  return getPlacesAsync(url, 1);
 };
 //takes an array of event id, then builds the giant FQL query url. Can take upto 2000 event id's at a time.
 var getEvents = function(ids){
@@ -108,7 +113,7 @@ var arraySplit = function(array, targetLength){
   }
   return superArray;
 };
-//promise that fetches the access token from facebook
+//promise that fetches the access token from facebook, returns cached token if avaliable
 var getAccessToken = function(){
   if (facebookToken){
     return Promise.join().then(function(){
@@ -117,7 +122,7 @@ var getAccessToken = function(){
   }else{
     return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
     .spread(function(res, body){
-      var facebookToken = body.split("access_token=")[1] || null;
+      facebookToken = body.split("access_token=")[1] || null;
       if(!facebookToken){
         throw "Invalid FB Access Token!";
       }
@@ -129,7 +134,7 @@ var getAccessToken = function(){
 //starts the data gathering sequence
 getAccessToken()
 .then(function(token){
-  console.log("TOKEN", token);
+  console.log("TOKEN:", token);
   //geo-codes the target address 
   return request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}});
 })
@@ -145,11 +150,35 @@ getAccessToken()
   }
 })
 .then(function(data){
-  var url = "https://graph.facebook.com/search?q=*&type=place&center="+data.lat+","+data.lon+"&distance="+radius+"&access_token="+facebookToken;
-  return getPlacesAsync(url, 2);
+  var latMile = 1/69;
+  var coords = [];
+  var startLat = data.lat;
+  var startLon = data.lon;
+  //creates a list of coords spaced 1 mile apart in a grid, for a 20 mile box
+  for(var i = -10; i<=10; i++){
+    for(var j = -10; j<=10; j++){
+      coords.push({
+        lat: startLat+latMile/2*i, 
+        lon: startLon+latMile/2*j
+      });
+    }
+  }
+  console.log("querying", coords.length,"coordinates");
+  var eventPromises = _.map(coords, function(item, index){
+    return Promise.delay(index * 1000)
+    .then(function(){
+      return getPlacesAtLocation(item.lat, item.lon);
+    });
+  });
+  return Promise.all(eventPromises);
 })
-.then(function(places){
-  console.log("Getting "+places.length+" EventIdsByLocationName..");
+.then(function(){
+  locationNames = _.uniq(locationNames);
+  console.log("PLACES:", locationNames);
+  console.log("PLACES:", locationNames.length);
+  terminateProgram();
+  console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
+  
   //delayed to prevent denial of service
   var eventPromises = _.map(places, function(place, index){
     return Promise.delay(100*index).then(function(){
@@ -163,7 +192,6 @@ getAccessToken()
 .then(function(){
   var superArray = arraySplit(eventIds, 1000);
   console.log("eventIds length:",eventIds.length);
-
   //delays to prevent denial of service
   var eventPromises = _.map(superArray, function(eids, index){
     return Promise.delay(100*index).then(function(){
