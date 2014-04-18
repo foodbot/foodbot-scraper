@@ -83,6 +83,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     rsvpCount: item.yes_rsvp_count,
     time: item.time,
     url: item.event_url,
+    location: [item.venue.lat, item.venue.lon],
     venue: {
       name: item.venue.name,
       address: {

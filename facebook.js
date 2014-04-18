@@ -220,6 +220,7 @@ getAccessToken()
       rsvpCount: item.attending_count,
       time: new Date(item.start_time).getTime(),
       url: "https://www.facebook.com/events/"+item.eid+"/",
+      location:[item.venue.latitude, item.venue.longitude],
       venue: {
         name: item.location,
         address: {
