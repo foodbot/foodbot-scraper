@@ -173,14 +173,14 @@ getAccessToken()
   return Promise.all(eventPromises);
 })
 .then(function(){
+  //have all the location names now
   locationNames = _.uniq(locationNames);
   console.log("PLACES:", locationNames);
   console.log("PLACES:", locationNames.length);
-  terminateProgram();
   console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
   
-  //delayed to prevent denial of service
-  var eventPromises = _.map(places, function(place, index){
+  //delayed to prevent denial of service - very big operation, 1 call per location name
+  var eventPromises = _.map(locationNames, function(place, index){
     return Promise.delay(100*index).then(function(){
       return getEventIdsByLocationName(place);
     });
@@ -190,7 +190,7 @@ getAccessToken()
   return Promise.all(eventPromises);
 })
 .then(function(){
-  var superArray = arraySplit(eventIds, 1000);
+  var superArray = arraySplit(eventIds, 2000);
   console.log("eventIds length:",eventIds.length);
   //delays to prevent denial of service
   var eventPromises = _.map(superArray, function(eids, index){
@@ -220,7 +220,6 @@ getAccessToken()
       rsvpCount: item.attending_count,
       time: new Date(item.start_time).getTime(),
       url: "https://www.facebook.com/events/"+item.eid+"/",
-      location:[item.venue.latitude, item.venue.longitude],
       venue: {
         name: item.location,
         address: {
@@ -235,7 +234,9 @@ getAccessToken()
       ticketUrl: item.ticket_uri || null,
       unique: item.eid
     };
-
+    if(item.venue.latitude && item.venue.longitude){
+      dbItem.location = [item.venue.lat, item.venue.lon];
+    }
     return db.facebook.findOne({unique: dbItem.unique})
     .then(function(entry){
       insertCount++;

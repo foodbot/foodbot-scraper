@@ -75,7 +75,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
 .map(function(item){
   item.venue = item.venue || {};
   item.fee = item.fee || {};
-  return {
+  var obj = {
     name: item.name,
     description: item.description,
     duration: item.duration,
@@ -83,7 +83,6 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     rsvpCount: item.yes_rsvp_count,
     time: item.time,
     url: item.event_url,
-    location: [item.venue.lat, item.venue.lon],
     venue: {
       name: item.venue.name,
       address: {
@@ -97,6 +96,10 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     },
     unique: item.event_url
   };
+  if(item.venue.lat && item.venue.lon){
+    item.location = [item.venue.lat, item.venue.lon];
+  }
+  return obj;
 })
 .then(function(results){
   console.log("Inserting "+results.length+" events into db..");

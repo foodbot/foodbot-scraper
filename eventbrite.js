@@ -92,6 +92,7 @@ var scrapeEventPage = function(url, index){
       },
       unique: url
     };
+
     return Promise.all([
       request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:address}}),
       item
@@ -102,7 +103,9 @@ var scrapeEventPage = function(url, index){
     if(body.status === "OK"){
       var lat = body.results[0].geometry.location.lat;
       var lon = body.results[0].geometry.location.lng;
-      item.location = [lat, lon];
+      if(lat && lon){
+        item.location = [lon];
+      }
       item.venue.address.latitude = lat;
       item.venue.address.longitude = lon;
       return item;
