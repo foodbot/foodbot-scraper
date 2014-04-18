@@ -7,7 +7,7 @@ var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]);
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
 var facebookAppId = process.env.FACEBOOKAPPID;
 var facebookSecret = process.env.FACEBOOKSECRET;
-var facebookToken = process.env.FACEBOOKTOKEN || undefined;
+var facebookToken = process.env.FACEBOOKTOKEN;
 var radius = "7000"; //in meters
 var targetAddress = "San Francisco";
 var insertCount = 0;
@@ -123,10 +123,11 @@ var getAccessToken = function(){
     return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
     .spread(function(res, body){
       facebookToken = body.split("access_token=")[1] || null;
-      if(!facebookToken){
-        throw "Invalid FB Access Token!";
-      }
-      return facebookToken;
+      // if(!facebookToken){
+      //   throw "Invalid FB Access Token!";
+      // }
+      throw "Invalid FB Access Token!";
+      // return facebookToken;
     });
   }
 };

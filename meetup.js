@@ -97,7 +97,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
     unique: item.event_url
   };
   if(item.venue.lat && item.venue.lon){
-    item.location = [item.venue.lat, item.venue.lon];
+    obj.location = [item.venue.lat, item.venue.lon];
   }
   return obj;
 })
