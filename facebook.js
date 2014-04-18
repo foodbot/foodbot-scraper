@@ -236,7 +236,7 @@ getAccessToken()
       unique: item.eid
     };
     if(item.venue.latitude && item.venue.longitude){
-      dbItem.location = [item.venue.lat, item.venue.lon];
+      dbItem.location = [item.venue.lon, item.venue.lat];
     }
     return db.facebook.findOne({unique: dbItem.unique})
     .then(function(entry){

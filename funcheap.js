@@ -118,7 +118,7 @@ var scrapeEventPage = function(url, index){
       var lat = body.results[0].geometry.location.lat;
       var lon = body.results[0].geometry.location.lng;
       if(lat && lon){
-        item.location = [lat, lon];
+        item.location = [lon, lat];
       }
       item.venue.address.latitude = lat;
       item.venue.address.longitude = lon;
