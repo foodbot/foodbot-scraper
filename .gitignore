@@ -6,6 +6,7 @@ scratchpad.txt
 runEventbrite.sh
 runFunCheap.sh
 runMeetup.sh
+runFacebook.sh
 /logs/facebook/*
 /logs/meetup/*
 /logs/eventbrite/*
