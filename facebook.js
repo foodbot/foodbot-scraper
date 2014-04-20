@@ -11,7 +11,7 @@ var facebookToken = process.env.FACEBOOKTOKEN;
 var radius = "7000"; //in meters
 var targetAddress = "San Francisco";
 var insertCount = 0;
-var terminateTimer;
+var terminateTimer;   
 var locationNames = [];
 var eventIds = [];
 var events = [];
@@ -21,14 +21,18 @@ var terminateProgram = function(){
   process.exit(1);
 };
 //gets all events at the location and adds id to eventIds
-var getEventIdsByLocationName = function(name){
+var getEventIdsByLocationName = function(name, index){
   var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+facebookToken;
+  // console.log("GET:", url);
   return request.getAsync(url)
   .spread(function(res, body){
     body = JSON.parse(body);
     if(!body.data){
-      throw "getEventIdsByLocationName - "+ JSON.stringify(body);
+      console.log(JSON.stringify(body));
+      return null;
+      // throw "getEventIdsByLocationName - "+ JSON.stringify(body);
     }
+    console.log("getEventIdsByLocationName["+index+"] - found", body.data.length, "event ids");
     eventIds = eventIds.concat(_.pluck(body.data, "id"));
   });
 };
@@ -155,9 +159,10 @@ getAccessToken()
   var coords = [];
   var startLat = data.lat;
   var startLon = data.lon;
-  //creates a list of coords spaced 1 mile apart in a grid, for a 20 mile box
-  for(var i = -10; i<=10; i++){
-    for(var j = -10; j<=10; j++){
+  var searchWidth = 10; //in miles
+  //creates a list of coords spaced 0.5 mile apart in a grid, for a 10x10 mile box
+  for(var i = -searchWidth; i<=searchWidth; i++){
+    for(var j = -searchWidth; j<=searchWidth; j++){
       coords.push({
         lat: startLat+latMile/2*i, 
         lon: startLon+latMile/2*j
@@ -166,7 +171,7 @@ getAccessToken()
   }
   console.log("querying", coords.length,"coordinates");
   var eventPromises = _.map(coords, function(item, index){
-    return Promise.delay(index * 1000)
+    return Promise.delay(index * 100)
     .then(function(){
       return getPlacesAtLocation(item.lat, item.lon);
     });
@@ -182,8 +187,8 @@ getAccessToken()
   
   //delayed to prevent denial of service - very big operation, 1 call per location name
   var eventPromises = _.map(locationNames, function(place, index){
-    return Promise.delay(100*index).then(function(){
-      return getEventIdsByLocationName(place);
+    return Promise.delay(1000*index).then(function(){
+      return getEventIdsByLocationName(place, index);
     });
   });
 
@@ -195,7 +200,7 @@ getAccessToken()
   console.log("eventIds length:",eventIds.length);
   //delays to prevent denial of service
   var eventPromises = _.map(superArray, function(eids, index){
-    return Promise.delay(100*index).then(function(){
+    return Promise.delay(2000*index).then(function(){
       return getEvents(eids);
     });
   });

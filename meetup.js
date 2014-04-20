@@ -78,7 +78,7 @@ request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{k
   var obj = {
     name: item.name,
     description: item.description,
-    duration: item.duration,
+    duration: item.duration || 3*60*60*1000,
     fee: item.fee.amount,
     rsvpCount: item.yes_rsvp_count,
     time: item.time,
