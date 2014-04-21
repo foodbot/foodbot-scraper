@@ -159,10 +159,24 @@ getAllTokens()
     }
   }
   console.log("querying", coords.length,"coordinates");
+  var eventPromises = _.map(coords, function(item, index){
+    return Promise.delay(index * 100)
+    .then(function(){
+      return getPlacesAtLocation(item.lat, item.lon);
+    });
+  });
+  return Promise.all(eventPromises);
+})
+.then(function(){
+  //locationNames is full now
+  locationNames = _.uniq(locationNames);
+  console.log("PLACES:", locationNames);
+  console.log("PLACES:", locationNames.length);
+  var superArray = arraySplit(eventIds, 2000);
 
-  var promise = _.reduce(coords, function(memo, item){
-    return memo.then(function(){
-      return startSequenceAtLocation(item.lat, item.lon);
+  var promise = _.reduce(superArray, function(memo, names){
+   return memo.then(function(){
+     return startSequenceWithNames(names);
     });
   }, Promise.join());
   return promise;
@@ -176,29 +190,19 @@ getAllTokens()
 });
   
 //starts the data gathering sequence
-var startSequenceAtLocation = function(lat,lon){
-  insertCount = 0;
-  locationNames = [];
+var startSequenceWithNames = function(names){
   eventIds = [];
   events = [];
-  return getPlacesAtLocation(lat, lon)
-  .then(function(){
-    //have all the location names now
-    locationNames = _.uniq(locationNames);
-    console.log("PLACES:", locationNames);
-    console.log("PLACES:", locationNames.length);
-    console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
-    
-    //delayed to prevent denial of service - very big operation, 1 call per location name
-    var eventPromises = _.map(locationNames, function(place, index){
-      return Promise.delay(2000*index).then(function(){
-        return getEventIdsByLocationName(place, index);
-      });
+  console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
+  //delayed to prevent denial of service - very big operation, 1 call per location name
+  var eventPromises = _.map(locationNames, function(place, index){
+    return Promise.delay(2000*index).then(function(){
+      return getEventIdsByLocationName(place, index);
     });
+  });
 
     //populates global eventIds array
-    return Promise.all(eventPromises);
-  })
+  return Promise.all(eventPromises)
   .then(function(){
     var superArray = arraySplit(eventIds, 2000);
     console.log("eventIds length:",eventIds.length);
