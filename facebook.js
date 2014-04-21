@@ -18,7 +18,7 @@ var terminateProgram = function(){
   process.exit(1);
 };
 var getAllTokens = function(){
-  return db.facebookTokens.find()
+  return db.facebookTokens.find().toArray()
   .then(function(items){
     tokens = items;
     return tokens;
