@@ -125,26 +125,7 @@ var arraySplit = function(array, targetLength){
   }
   return superArray;
 };
-//promise that fetches the access token from facebook, returns cached token if avaliable
-// var getAccessToken = function(){
-//   if (facebookToken){
-//     return Promise.join().then(function(){
-//       return facebookToken;
-//     });
-//   }else{
-//     return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
-//     .spread(function(res, body){
-//       facebookToken = body.split("access_token=")[1] || null;
-//       // if(!facebookToken){
-//       //   throw "Invalid FB Access Token!";
-//       // }
-//       throw "Invalid FB Access Token!";
-//       // return facebookToken;
-//     });
-//   }
-// };
 
-//starts the data gathering sequence
 getAllTokens()
 .then(function(tokens){
   console.log("TOKENS:", tokens);
@@ -178,90 +159,13 @@ getAllTokens()
     }
   }
   console.log("querying", coords.length,"coordinates");
-  var eventPromises = _.map(coords, function(item, index){
-    return Promise.delay(index * 100)
-    .then(function(){
-      return getPlacesAtLocation(item.lat, item.lon);
-    });
-  });
-  return Promise.all(eventPromises);
-})
-.then(function(){
-  //have all the location names now
-  locationNames = _.uniq(locationNames);
-  console.log("PLACES:", locationNames);
-  console.log("PLACES:", locationNames.length);
-  console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
-  
-  //delayed to prevent denial of service - very big operation, 1 call per location name
-  var eventPromises = _.map(locationNames, function(place, index){
-    return Promise.delay(2000*index).then(function(){
-      return getEventIdsByLocationName(place, index);
-    });
-  });
 
-  //populates global eventIds array
-  return Promise.all(eventPromises);
-})
-.then(function(){
-  var superArray = arraySplit(eventIds, 2000);
-  console.log("eventIds length:",eventIds.length);
-  //delays to prevent denial of service
-  var eventPromises = _.map(superArray, function(eids, index){
-    return Promise.delay(1000*index).then(function(){
-      return getEvents(eids);
+  var promise = _.reduce(coords, function(memo, item){
+    return memo.then(function(){
+      return startSequenceAtLocation(item.lat, item.lon);
     });
-  });
-
-  //populates global events array
-  return Promise.all(eventPromises);
-})
-.then(function(){
-  console.log("Total Events:", events.length);
-  console.log("Trying to load events into DB..");
-  var eventPromises = _.map(events, function(item){
-    //add to db 
-    var fee = null;
-    if(item.ticket_uri){
-      fee = 99999;
-    }
-    // console.log(item);
-    var dbItem = {
-      name: item.name,
-      description: item.description,
-      duration: (new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) || 3*60*60*1000,
-      fee: fee,
-      rsvpCount: item.attending_count,
-      time: new Date(item.start_time).getTime(),
-      url: "https://www.facebook.com/events/"+item.eid+"/",
-      venue: {
-        name: item.location,
-        address: {
-          city: item.venue.city,
-          country: item.venue.country,
-          state: item.venue.state,
-          address1: item.venue.street +", "+item.venue.city,
-          latitude: item.venue.latitude,
-          longitude: item.venue.longitude,
-        }
-      },
-      ticketUrl: item.ticket_uri || null,
-      unique: item.eid
-    };
-    if(item.venue.latitude && item.venue.longitude){
-      dbItem.location = [item.venue.lon, item.venue.lat];
-    }
-    return db.facebook.findOne({unique: dbItem.unique})
-    .then(function(entry){
-      insertCount++;
-      if(!entry){
-        return db.facebook.insert(dbItem);
-      }else{
-        return db.facebook.update({unique: dbItem.unique}, dbItem);
-      }
-    });
-  });
-  return Promise.all(eventPromises);
+  }, Promise.join());
+  return promise;
 })
 .then(function(){
   terminateProgram();
@@ -270,4 +174,90 @@ getAllTokens()
   console.log("ERR:", err);
   terminateProgram();
 });
+  
+//starts the data gathering sequence
+var startSequenceAtLocation = function(lat,lon){
+  insertCount = 0;
+  locationNames = [];
+  eventIds = [];
+  events = [];
+  return getPlacesAtLocation(lat, lon)
+  .then(function(){
+    //have all the location names now
+    locationNames = _.uniq(locationNames);
+    console.log("PLACES:", locationNames);
+    console.log("PLACES:", locationNames.length);
+    console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
+    
+    //delayed to prevent denial of service - very big operation, 1 call per location name
+    var eventPromises = _.map(locationNames, function(place, index){
+      return Promise.delay(2000*index).then(function(){
+        return getEventIdsByLocationName(place, index);
+      });
+    });
+
+    //populates global eventIds array
+    return Promise.all(eventPromises);
+  })
+  .then(function(){
+    var superArray = arraySplit(eventIds, 2000);
+    console.log("eventIds length:",eventIds.length);
+    //delays to prevent denial of service
+    var eventPromises = _.map(superArray, function(eids, index){
+      return Promise.delay(1000*index).then(function(){
+        return getEvents(eids);
+      });
+    });
+
+    //populates global events array
+    return Promise.all(eventPromises);
+  })
+  .then(function(){
+    console.log("Total Events:", events.length);
+    console.log("Trying to load events into DB..");
+    var eventPromises = _.map(events, function(item){
+      //add to db 
+      var fee = null;
+      if(item.ticket_uri){
+        fee = 99999;
+      }
+      // console.log(item);
+      var dbItem = {
+        name: item.name,
+        description: item.description,
+        duration: (new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) || 3*60*60*1000,
+        fee: fee,
+        rsvpCount: item.attending_count,
+        time: new Date(item.start_time).getTime(),
+        url: "https://www.facebook.com/events/"+item.eid+"/",
+        venue: {
+          name: item.location,
+          address: {
+            city: item.venue.city,
+            country: item.venue.country,
+            state: item.venue.state,
+            address1: item.venue.street +", "+item.venue.city,
+            latitude: item.venue.latitude,
+            longitude: item.venue.longitude,
+          }
+        },
+        ticketUrl: item.ticket_uri || null,
+        unique: item.eid
+      };
+      if(item.venue.latitude && item.venue.longitude){
+        dbItem.location = [item.venue.lon, item.venue.lat];
+      }
+      return db.facebook.findOne({unique: dbItem.unique})
+      .then(function(entry){
+        insertCount++;
+        if(!entry){
+          return db.facebook.insert(dbItem);
+        }else{
+          return db.facebook.update({unique: dbItem.unique}, dbItem);
+        }
+      });
+    });
+    return Promise.all(eventPromises);
+  });
+};
 
