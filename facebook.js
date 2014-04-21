@@ -233,6 +233,7 @@ var startSequenceWithNames = function(names){
   .then(function(){
     console.log("Total Events:", events.length);
     console.log("Trying to load events into DB..");
+    var inserts;
     var eventPromises = _.map(events, function(item){
       //add to db 
       var fee = null;
@@ -268,11 +269,15 @@ var startSequenceWithNames = function(names){
       return db.facebook.findOne({unique: dbItem.unique})
       .then(function(entry){
         insertCount++;
+        console.log("Inserted/updated:",++inserts);
         if(!entry){
           return db.facebook.insert(dbItem);
         }else{
           return db.facebook.update({unique: dbItem.unique}, dbItem);
         }
+      })
+      .catch(function(err){
+        console.log(err);
       });
     });
     return Promise.all(eventPromises);
