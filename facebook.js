@@ -209,7 +209,7 @@ var startSequenceWithNames = function(names){
   events = [];
   console.log("Getting "+names.length+" EventIdsByLocationName..");
   //delayed to prevent denial of service - very big operation, 1 call per location name
-  var eventPromises = _.map(locationNames, function(place, index){
+  var eventPromises = _.map(names, function(place, index){
     return Promise.delay(100*index).then(function(){
       return getEventIdsByLocationName(place, index);
     });
