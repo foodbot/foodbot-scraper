@@ -180,7 +180,7 @@ getAllTokens()
   locationNames = _.uniq(locationNames);
   console.log("PLACES:", locationNames);
   console.log("PLACES:", locationNames.length);
-  var maxQueriesPerHour = 5000;
+  var maxQueriesPerHour = tokens*800;
   var arraySize = 200;
   var superArray = arraySplit(locationNames, arraySize);
 
@@ -191,7 +191,7 @@ getAllTokens()
     var i = maxQueriesPerHour/arraySize;
     if(index % i === i-1){
       memo = memo.then(function(){
-        console.log("Executed "+maxQueriesPerHour+"queries, waiting for 1 hour now..");
+        console.log("Executed "+maxQueriesPerHour+" queries, waiting for 1 hour now..");
         return Promise.delay(60*60*1000); //waits 60 mins every 5000 names
       });
     }
