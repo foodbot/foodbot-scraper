@@ -107,7 +107,7 @@ var getEvents = function(ids){
   .spread(function(res, body){
     body = JSON.parse(body);
     if(!body.data){
-      throw "getEvents - "+JSON.stringify(body);
+      console.log("getEvents - "+JSON.stringify(body));
     }
     body.data = body.data || [];
     
