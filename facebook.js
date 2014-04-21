@@ -2,16 +2,13 @@ var Promise = require('bluebird');
 var request = Promise.promisifyAll(require('request'));
 var _ = require('underscore');
 var pmongo = require('promised-mongo');
-var db = pmongo('mongodb://localhost:27017/feedme', ["facebook"]);
+var db = pmongo('mongodb://localhost:27017/feedme', ["facebook", "facebookTokens"]);
 
 var googleApiKey = process.env.GOOGLEAPIKEY || "123FAKEKEY";
-var facebookAppId = process.env.FACEBOOKAPPID;
-var facebookSecret = process.env.FACEBOOKSECRET;
-var facebookToken = process.env.FACEBOOKTOKEN;
 var radius = "7000"; //in meters
 var targetAddress = "San Francisco";
+var tokens = [];
 var insertCount = 0;
-var terminateTimer;   
 var locationNames = [];
 var eventIds = [];
 var events = [];
@@ -20,9 +17,20 @@ var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
+var getAllTokens = function(){
+  return db.facebookTokens.find()
+  .then(function(items){
+    tokens = items;
+    return tokens;
+  });
+};
+var getRandomToken = function(){
+  var index = Math.floor(tokens.length * Math.random());
+  return tokens[index];
+};
 //gets all events at the location and adds id to eventIds
 var getEventIdsByLocationName = function(name, index){
-  var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+facebookToken;
+  var url = "https://graph.facebook.com/search?q="+name+"&type=event&access_token="+getRandomToken();
   // console.log("GET:", url);
   return request.getAsync(url)
   .spread(function(res, body){
@@ -82,7 +90,7 @@ var getPlacesAsync = function(apiURL, recursiveCount){
   });
 };
 var getPlacesAtLocation = function(lat,lon){
-  var url = "https://graph.facebook.com/search?q=a&type=place&center="+lat+","+lon+"&distance="+radius+"&access_token="+facebookToken;
+  var url = "https://graph.facebook.com/search?q=a&type=place&center="+lat+","+lon+"&distance="+radius+"&access_token="+getRandomToken();
   return getPlacesAsync(url, 1);
 };
 //takes an array of event id, then builds the giant FQL query url. Can take upto 2000 event id's at a time.
@@ -93,7 +101,7 @@ var getEvents = function(ids){
   eids = eids.join(" OR ");
 
   // console.log("EIDS:", eids);
-  var url = "https://graph.facebook.com/fql?q=SELECT name,description,attending_count,eid,start_time,end_time,location,venue,ticket_uri FROM event WHERE "+eids+"&access_token="+facebookToken;
+  var url = "https://graph.facebook.com/fql?q=SELECT name,description,attending_count,eid,start_time,end_time,location,venue,ticket_uri FROM event WHERE "+eids+"&access_token="+getRandomToken();
   
   return request.getAsync(url)
   .spread(function(res, body){
@@ -118,28 +126,28 @@ var arraySplit = function(array, targetLength){
   return superArray;
 };
 //promise that fetches the access token from facebook, returns cached token if avaliable
-var getAccessToken = function(){
-  if (facebookToken){
-    return Promise.join().then(function(){
-      return facebookToken;
-    });
-  }else{
-    return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
-    .spread(function(res, body){
-      facebookToken = body.split("access_token=")[1] || null;
-      // if(!facebookToken){
-      //   throw "Invalid FB Access Token!";
-      // }
-      throw "Invalid FB Access Token!";
-      // return facebookToken;
-    });
-  }
-};
+// var getAccessToken = function(){
+//   if (facebookToken){
+//     return Promise.join().then(function(){
+//       return facebookToken;
+//     });
+//   }else{
+//     return request.getAsync("https://graph.facebook.com/oauth/access_token?grant_type=client_credentials&client_id="+facebookAppId+"&client_secret="+facebookSecret)
+//     .spread(function(res, body){
+//       facebookToken = body.split("access_token=")[1] || null;
+//       // if(!facebookToken){
+//       //   throw "Invalid FB Access Token!";
+//       // }
+//       throw "Invalid FB Access Token!";
+//       // return facebookToken;
+//     });
+//   }
+// };
 
 //starts the data gathering sequence
-getAccessToken()
-.then(function(token){
-  console.log("TOKEN:", token);
+getAllTokens()
+.then(function(tokens){
+  console.log("TOKENS:", tokens);
   //geo-codes the target address 
   return request.getAsync({url:"https://maps.googleapis.com/maps/api/geocode/json", qs:{key:googleApiKey, sensor:"false", address:targetAddress}});
 })
