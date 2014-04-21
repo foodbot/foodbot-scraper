@@ -195,7 +195,7 @@ getAllTokens()
   
   //delayed to prevent denial of service - very big operation, 1 call per location name
   var eventPromises = _.map(locationNames, function(place, index){
-    return Promise.delay(1000*index).then(function(){
+    return Promise.delay(4000*index).then(function(){
       return getEventIdsByLocationName(place, index);
     });
   });
