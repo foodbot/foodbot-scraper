@@ -172,7 +172,7 @@ getAllTokens()
   locationNames = _.uniq(locationNames);
   console.log("PLACES:", locationNames);
   console.log("PLACES:", locationNames.length);
-  var superArray = arraySplit(eventIds, 2000);
+  var superArray = arraySplit(locationNames, 250);
 
   var promise = _.reduce(superArray, function(memo, names){
    return memo.then(function(){
