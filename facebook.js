@@ -268,7 +268,7 @@ var startSequenceWithNames = function(names){
         unique: item.eid
       };
       if(item.venue.latitude && item.venue.longitude){
-        dbItem.location = [item.venue.lon, item.venue.lat];
+        dbItem.location = [item.venue.latitude, item.venue.longitude];
       }
       return db.facebook.findOne({unique: dbItem.unique})
       .then(function(entry){
