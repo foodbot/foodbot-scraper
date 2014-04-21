@@ -17,6 +17,14 @@ var terminateProgram = function(){
   console.log("Program finished,", insertCount, "entries added / updated");
   process.exit(1);
 };
+setInterval(function(){
+  db.runCommand({ping:1})
+  .then(function(res) {
+    if(res.ok){ 
+      console.log("We're still up!");
+    }
+  });
+}, 3000);
 var getAllTokens = function(){
   return db.facebookTokens.find().toArray()
   .then(function(items){
@@ -172,12 +180,18 @@ getAllTokens()
   locationNames = _.uniq(locationNames);
   console.log("PLACES:", locationNames);
   console.log("PLACES:", locationNames.length);
-  var superArray = arraySplit(locationNames, 250);
+  var superArray = arraySplit(locationNames, 1000);
 
-  var promise = _.reduce(superArray, function(memo, names){
-   return memo.then(function(){
+  var promise = _.reduce(superArray, function(memo, names, index){
+    memo = memo.then(function(){
      return startSequenceWithNames(names);
     });
+    if(index % 5 === 4){
+      memo = memo.then(function(){
+        return Promise.delay(60*60*1000); //waits 60 mins every 5000 names
+      });
+    }
+   return memo;
   }, Promise.join());
   return promise;
 })
@@ -196,7 +210,7 @@ var startSequenceWithNames = function(names){
   console.log("Getting "+names.length+" EventIdsByLocationName..");
   //delayed to prevent denial of service - very big operation, 1 call per location name
   var eventPromises = _.map(locationNames, function(place, index){
-    return Promise.delay(2000*index).then(function(){
+    return Promise.delay(100*index).then(function(){
       return getEventIdsByLocationName(place, index);
     });
   });
