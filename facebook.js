@@ -193,7 +193,7 @@ getAllTokens()
 var startSequenceWithNames = function(names){
   eventIds = [];
   events = [];
-  console.log("Getting "+locationNames.length+" EventIdsByLocationName..");
+  console.log("Getting "+names.length+" EventIdsByLocationName..");
   //delayed to prevent denial of service - very big operation, 1 call per location name
   var eventPromises = _.map(locationNames, function(place, index){
     return Promise.delay(2000*index).then(function(){
