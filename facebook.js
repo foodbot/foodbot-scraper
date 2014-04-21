@@ -20,7 +20,7 @@ var terminateProgram = function(){
 var getAllTokens = function(){
   return db.facebookTokens.find().toArray()
   .then(function(items){
-    tokens = items;
+    tokens = _.pluck(items, "token");
     return tokens;
   });
 };
