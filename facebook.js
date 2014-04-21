@@ -98,7 +98,7 @@ var getPlacesAsync = function(apiURL, recursiveCount){
   });
 };
 var getPlacesAtLocation = function(lat,lon){
-  var url = "https://graph.facebook.com/search?q=a&type=place&center="+lat+","+lon+"&distance="+radius+"&access_token="+getRandomToken();
+  var url = "https://graph.facebook.com/search?q=*&type=place&center="+lat+","+lon+"&distance="+radius+"&access_token="+getRandomToken();
   return getPlacesAsync(url, 1);
 };
 //takes an array of event id, then builds the giant FQL query url. Can take upto 2000 event id's at a time.
