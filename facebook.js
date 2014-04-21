@@ -180,14 +180,18 @@ getAllTokens()
   locationNames = _.uniq(locationNames);
   console.log("PLACES:", locationNames);
   console.log("PLACES:", locationNames.length);
-  var superArray = arraySplit(locationNames, 200);
+  var maxQueriesPerHour = 5000;
+  var arraySize = 200;
+  var superArray = arraySplit(locationNames, arraySize);
 
   var promise = _.reduce(superArray, function(memo, names, index){
     memo = memo.then(function(){
      return startSequenceWithNames(names);
     });
-    if(index % 5 === 4){
+    var i = maxQueriesPerHour/arraySize;
+    if(index % i === i-1){
       memo = memo.then(function(){
+        console.log("Executed "+maxQueriesPerHour+"queries, waiting for 1 hour now..");
         return Promise.delay(60*60*1000); //waits 60 mins every 5000 names
       });
     }
@@ -233,7 +237,7 @@ var startSequenceWithNames = function(names){
   .then(function(){
     console.log("Total Events:", events.length);
     console.log("Trying to load events into DB..");
-    var inserts;
+    var inserts = 0;
     var eventPromises = _.map(events, function(item){
       //add to db 
       var fee = null;
